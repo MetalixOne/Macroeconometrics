@@ -1,0 +1,143 @@
+---
+title: "Laboratorio 2. Heteroscedasticidad"
+author: "Equipo 5"
+date: "2023-02-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1853968 Katia Denisse García Rodríguez
+
+1844635 David Josue Vera Leyva
+
+1919323 Miguel Alejandro García Navarro
+
+1908632 Axel Emilio Castro Rentería
+
+## 1. Carga en r la base de datos de cigarros que esta en la librería AER.
+```{r}
+lapply(c('AER','car','sandwich','lmtest'), library, character.only=T)
+data("CigarettesB")
+df <- CigarettesB
+rm(CigarettesB)
+```
+
+## 2. Corre una regresión de MCO con la variable dependiente packs y la variable independiente price.
+Se corre la regresión, donde la variable dependiente son los paquetes, y la variable explicativa es el precio.
+```{r}
+reg <- lm(df$packs ~ df$price)
+summary(reg)
+```
+El coeficiente del precio indica que al aumentar el precio, el número de paquetes vendidos se reduce, ésto es consistente con la ley de la demanda.
+
+Ambos coeficientes, el del intercepto y el del precio son estadísticamente significativos.
+
+## 3. Grafica los residuales y explica que observas.
+```{r}
+plot(reg$residuals, ylab = "Residuals", xlab = "")
+```
+
+Al graficar los residuales, no parece haber heteroscedasticidad, pero hay que hacer pruebas de hipótesis para tener mayor precisión.
+
+## 4. A mano, has la prueba de Goldfeld y Quandt para 3 grupos e indica si hay heteroscedasticidad.
+Primero se ordena la base de datos en base a el precio.
+Se obtienen dos submuestras de la base de datos, una con los precios más bajos, y la otra con los precios más altos. En este caso las submuestras tienen 15 observaciones.
+```{r}
+dfo <- df[order(df$price, decreasing = F),]
+df1 <- dfo[1:15,]
+df2 <- dfo[32:46,]
+```
+Se corre la regresión para cada submuestra, y se obtienen los residuales.
+```{r}
+reg1 <- lm(df1$packs ~ df1$price)
+res1 <- matrix(reg1$residuals)
+reg2 <- lm(df2$packs ~ df2$price)
+res2 <- matrix(reg2$residuals)
+```
+Para obtener el estadístico de prueba, se divide la suma de cuadrados de los residuales entre los grados de libertad; luego de estas divisiones se dividen entre ellas, usando la de la submuestra con los valores más altos de precio como numerador.
+```{r}
+(t(res2)%*%res2/13)/(t(res1)%*%res1/13)
+```
+Posteriormente se obtiene el estadístico F, con un nivel de significancia del 0.05.
+```{r}
+qf(p = 0.05, df1 = 13, df2 = 13, lower.tail = F)
+```
+El estadístico de prueba se encuentra fuera de la zona de rechazo, por lo que decimos que no hay heteroscedasticidad.
+
+## 5. Corre una regresión de MCO incluyendo la variable income a la regresion anterior.
+```{r}
+reg3 <- lm(df$packs ~ df$price + df$income)
+summary(reg3)
+```
+
+De nuevo los coeficientes tienen sentido, entre mayor el precio del paquete, menor será la cantidad que se venda; y entre mayor sea el ingreso, más cantidad de éstas se venderá. Sin embargo, se encuentra que la variable ingreso no es estadísticamente significativa.
+
+```{r}
+plot(reg3$residuals, ylab = "Residuales", xlab = "")
+```
+
+Al graficar los residuales, no parece que haya heteroscedasticidad.
+
+## 6. Utilizando la funcion de R y eliminando 12 observaciones del centro, realiza la prueba de Golgfeld y Quandt
+```{r}
+gqtest(reg3, order.by = df$price, fraction = 12)
+gqtest(reg3, order.by = df$income, fraction = 12)
+```
+Ordenando por precios, el p-value obtenido es de 0.6752, con un nivel de significancia del 0.05, no rechazamos la hipótesis nula, ésta prueba indica que hay homoscedasticidad.
+Ordenando por ingreso, el p-value obtenido es 0.9798, también indica que hay homoscedasticidad.
+
+## 7.Investiga como se hace la prueba de Breusch-Pagan teoricamente y realiza la prueba de Breusch-Pagan con ayuda de R. Indica si hay heteroscedasticidad.
+
+## Breusch-Pagan
+
+La prueba Breush-Pagan sirve para saber si existe heterocedasticidad
+
+Los pasos al realizar esta prueba son los siguientes:
+  
+1) Corrrer MCO para toda la muestra.
+2) Obtener los estimadores $\hat{B}$ y $\hat{u}$.
+3) Correr la regrsión auxiliar de mi estimador de $u$ contra cualquier combinación de $X$
+4) Obtenemos el estadístico de prueba:
+
+$\lambda = \frac{S_0}{2\sigma^2} > X_r^2$ 
+, donde:
+
+$S_0$ es la suma de los cuadrados de los residuales de la regresión auxiliar, y
+
+$\sigma^2 = \frac{\sum\hat{u}^2}{n}$
+```{r}
+bptest(reg3, studentize = F)
+```
+
+Se obtiene un p-value de 0.04547. con un nivel de significancia del 0.05, rechazamos la hipótesis nula, decimos que sí hay heteroscedasticidad.
+
+## 8. Realiza la prueba de White e indica si hay heteroscedasticidad.
+```{r}
+bptest(reg3, ~ df$price^2 + df$income^2 + df$price*df$income)
+```
+Obtenemos un p-value de 0.07422, con un nivel de significancia del 0.05 no se rechaza la hipótesis nula, por lo que esta prueba indica que hay homoscedasticidad.
+
+## 9. En caso de ser necesario corrige las regresiones utilizando el estimador de White de la varianza asintótica de beta.
+```{r}
+#Corregida por White:
+vcovHC(reg3)
+
+#Original:
+vcov(reg3)
+```
+Al observar la matriz varianza-covarianza de los estimadores, la corregida por White, y la original, se observa que al hacer corrección hay mayor varianza, por lo que podemos ver que la heteroscedasticidad no es un problema en esta regresión.
+
+Dos pruebas de hipótesis nos señalaban homoscedasticidad, mientras que una señalaba heteroscedasticidad, por ello es importante corregir para saber si la heteroscedasticidad es un problema o no.
+
+## 10. Corre los siguientes comandos y explica que es lo que hacen estos comandos.
+
+El comando gqtest() nos sirve para realizar la prueba Goldfeld-Quandt, en los paréntesis se indica la regresión sobre la que se hace la prueba, y se pone fraction =  para indicar cuántos datos de en medio serán los omitidos.
+
+El comando bptest() sirve para realizar la prueba Breusch-Pagan. En los paréntesis se indica la regresión sobre la que se hace la prueba.
+
+El comando bptest(,~)  sirve para hacer la prueba de White, primero se pone la regresión sobre la que se hace la prueba, después se pone una coma y una ~, con la que después se indican las variables extra con las que se hará la regresión auxiliar.
+
+El comando vcovHC() nos ayuda a obtener la matriz varianza-covarianza de la regresión corregida por White. En el paréntesis se indica la regresión que se corrige.
