@@ -7,3 +7,5 @@ rm(USConsump1993)
 reg <- lm(expenditure ~ income, data = df)
 summary(reg)
 plot(reg$residuals, ylab = "Residuales", xlab = "")
+
+##America First
